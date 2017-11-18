@@ -1,10 +1,16 @@
 #include <iostream>
+#include <fstream>
 #include <string>
 #include <vector>
 
 using std::cin;
 using std::cout;
 using std::endl;
+
+using std::ifstream;
+using std::getline;
+
+using std::string;
 
 using std::vector;
 
@@ -24,13 +30,14 @@ struct coordi	//A coordinate pair of integers
 //Idea: Don't actually store a 2-d grid of ships, store a vector of ships and instead have their beginning and ending points tracked as part of them.  If a shot falls within
 		//their area, count that as a shot.
 
-enum cellContents_type {	//What a given cell on the game board contains
-	empty,					// (either ocean or ship type)
-	ship_frigate,
-	ship_tender,
-	ship_destroyer,
-	ship_cruiser,
-	ship_carrier
+enum cellContents_type {	//What a given cell on the game board contains (either ocean or ship type)
+	empty,					//aka the ocean
+	ship_frigate,			//---------
+	ship_tender,			//    | 
+	ship_destroyer,			//Ships on the board
+	ship_cruiser,			//    |
+	ship_carrier,			//---------
+	invalid_cell			//An error type, used when data for an invalid cell is returned, or other error conditions
 };
 
 enum direction_type {		//A direction
@@ -38,6 +45,13 @@ enum direction_type {		//A direction
 	south,
 	east,
 	west
+};
+
+enum errorstates {			//Various errors that can be thrown 
+	file_notFound,		//reading from file - file not found
+	file_eof,			//reading from file - file ended too soon (but the error was recovered from, missing replaced with ~)
+	file_eof_fatal		//reading from file - file ended too soon (couldn't recover from)
+
 };
 
 class gameBoard_type		//A game board.  Set up as a class so 2-person play is possible, and also to add data validation functions (i.e. don't let things read/write to [-1, 6], etc)
@@ -106,20 +120,44 @@ public:
 
 	coordi getBoardSize() { return size; }
 
-	bool isValidPosition(coordi pos)
+	bool isValidPosition(coordi pos)		//Returns true when 'pos' is a valid position within the game board
 	{
 		return (0 < pos.x && pos.x < size.x) && (0 < pos.y && pos.y < size.y);
 	}
 
-	cellContents_type getContents(coordi pos)
+	cellContents_type getContents(coordi pos)	//Returns the contents of a cell, after making sure that the cell is valid
 	{
 		if(isValidPosition(pos)) return board[pos.x][pos.y];
+		return invalid_cell;	//It's only possible to reach this part if 'pos' is an invalid position
 	}
 
 	bool createShip(coordi startingPoint, direction_type direction, int length)
 	{
 
 	}
+
+	void loadFromFile(ifstream & file)		//Loads the game board from 'file'
+	{
+		if(!file)
+		{
+			//File does not exist
+			throw file_notFound;
+		}
+
+		string line;
+		getline(file, line);
+		
+	}
+
+
+	void loadFromFile(string filename)		//Loads the game board from a file, 'filename' 
+	{
+		ifstream file;
+		file.open(filename);
+		loadFromFile(file);	
+	}
+
+
 };
 
 int main()
