@@ -14,6 +14,15 @@ using std::string;
 
 using std::vector;
 
+enum gameState_type		//The current state the game is in
+{
+	title,				//The game is on the title screen
+	running,			//The game is running normally
+	error,				//The game has encountered an error that cannot be recovered from
+	win,				//The player has won
+	lose,				//The player has lost
+} gameState;
+
 struct coordi	//A coordinate pair of integers
 {
 	coordi::coordi() {}
@@ -31,13 +40,11 @@ struct coordi	//A coordinate pair of integers
 		//their area, count that as a shot.
 
 enum cellContents_type {	//What a given cell on the game board contains (either ocean or ship type)
-	empty,					//aka the ocean
-	ship_frigate,			//---------
-	ship_tender,			//    | 
-	ship_destroyer,			//Ships on the board
-	ship_cruiser,			//    |
-	ship_carrier,			//---------
-	invalid_cell			//An error type, used when data for an invalid cell is returned, or other error conditions
+	null,					//No data
+	empty,					//aka the ocean			'~' on screen
+	ship,					//A ship (hidden from the player)
+	destroyed_ship,			//The wreckage of a destroyed ship		'%' on screen
+	invalid_cell			//An error type, used when data for a cell that does not exits
 };
 
 enum direction_type {		//A direction
@@ -48,9 +55,34 @@ enum direction_type {		//A direction
 };
 
 enum errorstates {			//Various errors that can be thrown 
+	noerror,			//No error
 	file_notFound,		//reading from file - file not found
-	file_eof,			//reading from file - file ended too soon (but the error was recovered from, missing replaced with ~)
-	file_eof_fatal		//reading from file - file ended too soon (couldn't recover from)
+	file_eof,			//reading from file - file ended too soon (but the error was recovered from, missing data replaced with empty space)
+	file_eof_fatal,		//reading from file - file ended too soon (couldn't recover from)
+	file_lineTooShort,	//reading from file - line too short (but the error was recovered from, missing data replaced with empty space)
+	file_lineTooLong	//reading from file - line too long (but the error was recovered from, missing data replaced with empty space)
+
+
+};
+
+namespace utilities
+{
+	cellContents_type toCellType(char data)
+	{
+		if(data == '~') return empty;
+		else if(data == '#') return ship;
+		else if(data == 'H') return destroyed_ship;
+		else return invalid_cell;
+	}
+
+	vector<cellContents_type> extractCellsFromString(string str)	//Extracts data from 'str' and converts it to a vector of 'cellContents_type' elements.  Ignores spaces.
+	{
+		vector<cellContents_type> data;
+		for(auto iter = str.begin(); iter != str.end(); iter++)
+		{
+			if(*iter != ' ') data.push_back(toCellType(*iter));
+		}
+	}
 
 };
 
@@ -93,20 +125,23 @@ private:
 	vector<vector<cellContents_type>> board;	//The game board, indexed by x and y coordinates
 	coordi size;								//The dimensions of the game board
 
+	//File loader flags
+	vector<errorstates> fileErrors;
+
 public:
 	void emptyBoard()		//Empties the game board.  WILL RESULT IN DATA LOSS
 	{
 		//Empty the data from the board
 		while(board.size() > 0) board.pop_back();
 
-		//Repopulate the board with empty spaces
+		//Repopulate the board with null cells spaces
 		{
 			vector<cellContents_type> column;	//An empty column
 
 			//Expand the empty column 'template' to the proper size
 			for(int i = 0; i < size.y; i++)
 			{
-				column.push_back(empty);
+				column.push_back(null);
 			}
 
 			//Insert the empty column into the x-vector to build the chart to the proper width
@@ -143,10 +178,41 @@ public:
 			//File does not exist
 			throw file_notFound;
 		}
-
-		string line;
-		getline(file, line);
 		
+		//Load each line from the file, and store it in each row
+		for(int y = 0; y < size.y; y++)
+		{
+			string line;
+			getline(file, line);
+
+			if(!file.eof())
+			{	//If the line from the file was loaded successfully
+				vector<cellContents_type> row = utilities::extractCellsFromString(line);
+
+				if(row.size > size.x)	//If the data from the file is larger than expected
+				{
+					fileErrors.push_back(file_lineTooLong);
+				}
+				else if(row.size < size.x)	//If the data from the file is shorter than expected
+				{
+					fileErrors.push_back(file_lineTooShort);
+				}
+
+				//Store the data loaded
+				for(int x = 0; x < size.x; x++)
+				{
+					board[x][y] = row[x];
+				}
+			}
+			else
+			{
+				fileErrors.push_back(file_eof);
+				for(int x = 0; x < size.x; x++)
+				{
+					board[x][y] = empty;
+				}
+			}
+		}
 	}
 
 
@@ -160,9 +226,15 @@ public:
 
 };
 
+gameBoard_type gameBoard;
+
+void setup()		//General startup actions
+{
+	gameState = running;
+}
+
 int main()
 {
-
 	gameBoard_type gameboard(coordi(25, 25));
 
 
