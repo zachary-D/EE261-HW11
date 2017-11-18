@@ -33,77 +33,99 @@ enum cellContents_type {	//What a given cell on the game board contains
 	ship_carrier
 };
 
+enum direction_type {		//A direction
+	north,
+	south,
+	east,
+	west
+};
+
 class gameBoard_type		//A game board.  Set up as a class so 2-person play is possible, and also to add data validation functions (i.e. don't let things read/write to [-1, 6], etc)
 {
 public:
-	gameBoard_type::gameBoard_type() {}
+	gameBoard_type::gameBoard_type(coordi boardSize) {
+		size = boardSize;
 
-private:
-	vector<vector<cellContents_type>> board;	//The game board, indexed by x and y coordinates
-
-	bool autoExpandBoard = false;		//If true, 'board' will automatically be expanded as needed to write data to/read data from it.  If false, 'maxSize' controls the board size
-	coordi maxSize;						//The maximum dimensions of the game board, inclusivley.  Enabled/disabled by 'autoExpandBoard'
-
-public:
-	void emptyBoard()		//Empties the game board.  WILL RESULT IN DATA LOSS
-	{
-		while(board.size() > 0) board.pop_back();
-	}
-
-	//Used to lock or unlock the size of the game board
-	void lockBoardSize() { autoExpandBoard = false; }
-	void unlockBoardSize() { autoExpandBoard = true; }
-
-	void setBoardSize(coordi size)	//Sets the size of the game board to 'size', and locks it at that size.  //MAY RESULT IN DATA LOSS IF THE SIZE OF 'board' > 'size'
-	{
-		maxSize = size;
-		lockBoardSize();
-		
-		//Trim or expand the board to size
-		{
 		//Trim or expand the x-axis to size
-			while(board.size() > maxSize.x)
-			{
-				//Remove columns from the end of the x-axis vector
-				board.pop_back();
-			}
-			while(board.size() < maxSize.x)
-			{
-				//Add empty columns to the x-axis vector
-				board.push_back(vector<cellContents_type>());
-			}
+		while(board.size() > size.x)
+		{
+			//Remove columns from the end of the x-axis vector
+			board.pop_back();
+		}
+		while(board.size() < size.x)
+		{
+			//Add empty columns to the x-axis vector
+			board.push_back(vector<cellContents_type>());
+		}
 
-			//Iterate over the x-axis
-			for(auto iter = board.begin(); iter != board.end(); iter++)
+		//Iterate over the x-axis
+		for(auto iter = board.begin(); iter != board.end(); iter++)
+		{
+			//Trim or expand the elements in each of the y-axies to the proper size
+			while(iter->size() > size.y)
 			{
-				//Trim or expand the elements in each of the y-axies to the proper size
-				while(iter->size() > size.y)
-				{
-					//Remove elements from the the end of the y vector
-					iter->pop_back();
-				}
-				while(iter->size() < size.y)
-				{
-					//Add elements to the y vector
-					iter->push_back(empty);
-				}
+				//Remove elements from the the end of the y vector
+				iter->pop_back();
+			}
+			while(iter->size() < size.y)
+			{
+				//Add elements to the y vector
+				iter->push_back(empty);
 			}
 		}
 	}
 
+private:
+	vector<vector<cellContents_type>> board;	//The game board, indexed by x and y coordinates
+	coordi size;								//The dimensions of the game board
+
+public:
+	void emptyBoard()		//Empties the game board.  WILL RESULT IN DATA LOSS
+	{
+		//Empty the data from the board
+		while(board.size() > 0) board.pop_back();
+
+		//Repopulate the board with empty spaces
+		{
+			vector<cellContents_type> column;	//An empty column
+
+			//Expand the empty column 'template' to the proper size
+			for(int i = 0; i < size.y; i++)
+			{
+				column.push_back(empty);
+			}
+
+			//Insert the empty column into the x-vector to build the chart to the proper width
+			for(int i = 0; i < size.x; i++)
+			{
+				board.push_back(column);
+			}
+		}
+
+	}
+
+	coordi getBoardSize() { return size; }
+
+	bool isValidPosition(coordi pos)
+	{
+		return (0 < pos.x && pos.x < size.x) && (0 < pos.y && pos.y < size.y);
+	}
+
 	cellContents_type getContents(coordi pos)
 	{
-		if(pos.x < 0) throw "Cannot index negative x coordinate!";
-		if(pos.y < 0) throw "Cannot index negative y coordinate!";
-		if(pos.x > board.size()) throw "Cannot index x coordinate greater than x-axis size!";
-		if(pos.y > board[pos.x].size()) throw "Cannot index y coordinate greatr than y-axis size!";
+		if(isValidPosition(pos)) return board[pos.x][pos.y];
+	}
+
+	bool createShip(coordi startingPoint, direction_type direction, int length)
+	{
+
 	}
 };
 
 int main()
 {
 
-	gameBoard_type gameboard;
+	gameBoard_type gameboard(coordi(25, 25));
 
 
 	cin.get();
