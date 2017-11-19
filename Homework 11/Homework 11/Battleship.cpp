@@ -34,6 +34,11 @@ struct coordi	//A coordinate pair of integers
 
 	int x;
 	int y;
+
+	coordi operator+(coordi & other)
+	{
+		return coordi(x + other.x, y + other.y);
+	}
 };
 
 //Idea: Don't actually store a 2-d grid of ships, store a vector of ships and instead have their beginning and ending points tracked as part of them.  If a shot falls within
@@ -60,9 +65,12 @@ enum errorstates {			//Various errors that can be thrown
 	file_eof,			//reading from file - file ended too soon (but the error was recovered from, missing data replaced with empty space)
 	file_eof_fatal,		//reading from file - file ended too soon (couldn't recover from)
 	file_lineTooShort,	//reading from file - line too short (but the error was recovered from, missing data replaced with empty space)
-	file_lineTooLong	//reading from file - line too long (but the error was recovered from, missing data replaced with empty space)
+	file_lineTooLong,	//reading from file - line too long (but the error was recovered from, missing data replaced with empty space)
 
-
+	buffer_xToSmall,	//Screen buffer - x value for size is too small
+	buffer_yToSmall,	//Screen buffer - y value for size is too small
+	buffer_write_badX,	//Screen buffer - writing to screen - x is out of bounds
+	buffer_write_badY,	//Screen buffer - writing to screen - y is out of bounds
 };
 
 namespace utilities
@@ -109,10 +117,80 @@ void clearConsole()
 	system("cls");
 }
 
-struct screenBuffer_type		//The buffer characters are written to before they are written to the screen.  Used to only change portions of the screen at once
+class screenBuffer_type		//The buffer characters are written to before they are written to the screen.  Used to only change portions of the screen at once
 {
+	coordi size;
+	vector<vector<char>> buffer;
 
+public:
+	void setSize(coordi _size)
+	{
+		if(_size.x < 1) throw buffer_xToSmall;
+		if(_size.y < 1) throw buffer_yToSmall;
+		size = _size;
+	
+		//While the buffer is larger than it should be
+		while(size.x < buffer.size())
+		{
+			buffer.pop_back();
+		}
+
+		//While the buffer is smaller than it should be
+		while(size.x > buffer.size())
+		{
+			buffer.push_back(vector<char>());
+		}
+
+		for(int i = 0; i < buffer.size(); i++)
+		{
+			//While the number of elements is larger than it should be
+			while(size.y < buffer[i].size())
+			{
+				buffer[i].pop_back();
+			}
+
+			//While the number of elements is smaller than it should be
+			while(size.y > buffer[i].size())
+			{
+				buffer[i].push_back(' ');
+			}
+		}
+	}
+
+	void pushToConsole()
+	{
+		clearConsole();
+		for(int y = 0; y < size.y; y++)
+		{
+			for(int x = 0; x < size.x; x++)
+			{
+				std::cout << buffer[x][y];
+			}
+			std::cout << '|' << std::endl;
+		}
+	}
+	
+	void write(coordi pos, char value)
+	{
+		if(!(0 <= pos.x && pos.x < size.x)) throw buffer_write_badX;
+		if(!(0 <= pos.y && pos.y < size.y)) throw buffer_write_badY;
+
+		buffer[pos.x][pos.y] = value;
+	}
+
+	void write(coordi pos, string value)
+	{
+		if(!(0 <= pos.x && pos.x + value.size()< size.x)) throw buffer_write_badX;
+		if(!(0 <= pos.y && pos.y < size.y)) throw buffer_write_badY;
+
+		for(int i = 0; i < value.size(); i++)
+		{
+			write(pos + coordi(i, 0), value[i]);
+		}
+	}
 };
+
+screenBuffer_type screen;
 
 class gameBoard_type		//A game board.  Set up as a class so 2-person play is possible, and also to add data validation functions (i.e. don't let things read/write to [-1, 6], etc)
 {
@@ -251,17 +329,17 @@ public:
 		loadFromFile(file);	
 	}
 
-	void print(bool clearScreenBefore = true)
+	void print(bool clearScreenBefore = true)		//TODO: rework to use the screen buffer
 	{
+		coordi displacement = coordi(1, 1);		//The coordinates of the upper left portion of the board on the buffer
 		if(clearScreenBefore) clearConsole();
 
 		for(int y = 0; y < size.y; y++)
 		{
 			for(int x = 0; x < size.x; x++)
 			{
-				cout << utilities::toChar(getContents(coordi(x, y))) << ' ';
+				screen.write(coordi(x * 2, y) + displacement, utilities::toChar(getContents(coordi(x, y))));
 			}
-			cout << endl;
 		}
 	}
 
@@ -272,28 +350,64 @@ gameBoard_type gameBoard(coordi(25, 25));
 void setup()		//General startup actions
 {
 	gameState = running;
-	cout << "Attempting to load level data..." << endl;
 
-	try
+	//Load level data
 	{
-		gameBoard.loadFromFile("levelData.dat");
+		cout << "Attempting to load level data..." << endl;
+		try
+		{
+			gameBoard.loadFromFile("levelData.dat");
+		}
+		catch(errorstates error)
+		{
+			if(error == file_notFound) cout << "An error was encoutered: The file could not be found." << endl;
+			else cout << "An unspecified error was encountered." << endl;
+		}
 	}
-	catch(errorstates error)
+
+	screen.setSize(coordi(25 * 2 + 20, 25 + 2));
+
+	//Draw border for game board
 	{
-		if(error == file_notFound) cout << "An error was encoutered: The file could not be found." << endl;
-		else cout << "An unspecified error was encountered." << endl;
+		//Top and bottom border
+		for(int x = 1; x < 50; x++)
+		{
+			screen.write(coordi(x, 0), char(205));
+			screen.write(coordi(x, 26), char(205));
+		}
+
+		//The left and right border
+		for(int y = 1; y < 25 + 1; y++)
+		{
+			screen.write(coordi(0, y), char(186));
+			screen.write(coordi(50, y), char(186));
+		}
+
+		//The corners
+		screen.write(coordi(0, 0), char(201));	//Top left
+		screen.write(coordi(50, 0), char(187));	//Top right
+		screen.write(coordi(0, 26), char(200));	//Bottom left
+		screen.write(coordi(50, 26), char(188));//Bottom right
+
+		//game board title 
+		screen.write(coordi(19, 0), char(185));
+		screen.write(coordi(30, 0), char(204));
+		screen.write(coordi(20, 0), "Game Board");
 	}
+
+	screen.pushToConsole();
+	cin.get();
 }
 
 int main()
 {
-	cout << "first" << endl;
-	cin.get();
-	clearConsole();
-	cout << "Second" << endl;
+	setup();
 
 
-	cin.get();
 	gameBoard.print();
+	screen.pushToConsole();
+
+
+
 	cin.get();
 }
