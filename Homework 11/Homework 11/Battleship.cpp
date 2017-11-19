@@ -109,6 +109,11 @@ void clearConsole()
 	system("cls");
 }
 
+struct screenBuffer_type		//The buffer characters are written to before they are written to the screen.  Used to only change portions of the screen at once
+{
+
+};
+
 class gameBoard_type		//A game board.  Set up as a class so 2-person play is possible, and also to add data validation functions (i.e. don't let things read/write to [-1, 6], etc)
 {
 public:
