@@ -41,7 +41,7 @@ struct coordi	//A coordinate pair of integers
 
 enum cellContents_type {	//What a given cell on the game board contains (either ocean or ship type)
 	null,					//No data
-	empty,					//aka the ocean			'~' on screen
+	ocean,					//The ocean			'~' on screen
 	ship,					//A ship (hidden from the player)
 	destroyed_ship,			//The wreckage of a destroyed ship		'%' on screen
 	invalid_cell			//An error type, used when data for a cell that does not exits
@@ -69,10 +69,27 @@ namespace utilities
 {
 	cellContents_type toCellType(char data)
 	{
-		if(data == '~') return empty;
+		if(data == '~') return ocean;
 		else if(data == '#') return ship;
 		else if(data == 'H') return destroyed_ship;
 		else return invalid_cell;
+	}
+
+	char toChar(cellContents_type data)
+	{
+		switch(data)
+		{
+			case ocean:
+				return '~';
+
+			case ship:
+				return '~';
+
+			case destroyed_ship:
+				return '%';
+		}
+
+		return toChar(ocean);	//Returns an ocean tile as a last resort/error recovery method
 	}
 
 	vector<cellContents_type> extractCellsFromString(string str)	//Extracts data from 'str' and converts it to a vector of 'cellContents_type' elements.  Ignores spaces.
@@ -82,9 +99,15 @@ namespace utilities
 		{
 			if(*iter != ' ') data.push_back(toCellType(*iter));
 		}
+		return data;
 	}
 
 };
+
+void clearConsole()
+{
+	system("cls");
+}
 
 class gameBoard_type		//A game board.  Set up as a class so 2-person play is possible, and also to add data validation functions (i.e. don't let things read/write to [-1, 6], etc)
 {
@@ -116,7 +139,7 @@ public:
 			while(iter->size() < size.y)
 			{
 				//Add elements to the y vector
-				iter->push_back(empty);
+				iter->push_back(ocean);
 			}
 		}
 	}
@@ -166,7 +189,7 @@ public:
 		return invalid_cell;	//It's only possible to reach this part if 'pos' is an invalid position
 	}
 
-	bool createShip(coordi startingPoint, direction_type direction, int length)
+	bool createShip(coordi startingPoint, direction_type direction = north, int length = 1)
 	{
 
 	}
@@ -189,11 +212,11 @@ public:
 			{	//If the line from the file was loaded successfully
 				vector<cellContents_type> row = utilities::extractCellsFromString(line);
 
-				if(row.size > size.x)	//If the data from the file is larger than expected
+				if(row.size() > size.x)	//If the data from the file is larger than expected
 				{
 					fileErrors.push_back(file_lineTooLong);
 				}
-				else if(row.size < size.x)	//If the data from the file is shorter than expected
+				else if(row.size() < size.x)	//If the data from the file is shorter than expected
 				{
 					fileErrors.push_back(file_lineTooShort);
 				}
@@ -209,7 +232,7 @@ public:
 				fileErrors.push_back(file_eof);
 				for(int x = 0; x < size.x; x++)
 				{
-					board[x][y] = empty;
+					board[x][y] = ocean;
 				}
 			}
 		}
@@ -223,20 +246,49 @@ public:
 		loadFromFile(file);	
 	}
 
+	void print(bool clearScreenBefore = true)
+	{
+		if(clearScreenBefore) clearConsole();
+
+		for(int y = 0; y < size.y; y++)
+		{
+			for(int x = 0; x < size.x; x++)
+			{
+				cout << utilities::toChar(getContents(coordi(x, y))) << ' ';
+			}
+			cout << endl;
+		}
+	}
 
 };
 
-gameBoard_type gameBoard;
+gameBoard_type gameBoard(coordi(25, 25));
 
 void setup()		//General startup actions
 {
 	gameState = running;
+	cout << "Attempting to load level data..." << endl;
+
+	try
+	{
+		gameBoard.loadFromFile("levelData.dat");
+	}
+	catch(errorstates error)
+	{
+		if(error == file_notFound) cout << "An error was encoutered: The file could not be found." << endl;
+		else cout << "An unspecified error was encountered." << endl;
+	}
 }
 
 int main()
 {
-	gameBoard_type gameboard(coordi(25, 25));
+	cout << "first" << endl;
+	cin.get();
+	clearConsole();
+	cout << "Second" << endl;
 
 
+	cin.get();
+	gameBoard.print();
 	cin.get();
 }
