@@ -51,6 +51,7 @@ enum cellContents_type {	//What a given cell on the game board contains (either 
 	ocean,					//The ocean			'~' on screen
 	ship,					//A ship (hidden from the player)
 	destroyed_ship,			//The wreckage of a destroyed ship		'%' on screen
+	shot_miss,				//A shot that hit nothing (displayed as ocean)
 	invalid_cell			//An error type, used when data for a cell that does not exits
 };
 
@@ -59,6 +60,13 @@ enum direction_type {		//A direction
 	south,
 	east,
 	west
+};
+
+enum shotResult {		//The possible outcomes of the player firing a shot
+	hit,
+	miss,
+	noAmmo,
+	alreadyFired,
 };
 
 enum errorstates {			//Various errors that can be thrown 
@@ -75,6 +83,9 @@ enum errorstates {			//Various errors that can be thrown
 	buffer_write_badY,	//Screen buffer - writing to screen - y is out of bounds
 
 	convert_fail_intStr,		//There was an error converting an integer to a string
+
+	board_badX,			//Game board - The x value is invalid
+	board_badY,			//Game board - The y value is invalid
 };
 
 namespace utilities
@@ -91,6 +102,9 @@ namespace utilities
 
 			case 'H':
 				return destroyed_ship;
+				
+			case 'M':
+				return shot_miss;
 		}
 		return ocean;		//Returns ocean as a last resort/error recovery method
 	}
@@ -103,10 +117,13 @@ namespace utilities
 				return '~';
 
 			case ship:
-				return '~';
+				return toChar(ocean);	//Display as ocean (they're hidden!)
 
 			case destroyed_ship:
-				return '%';
+				return 'H';
+
+			case shot_miss:
+				return 'M';
 		}
 
 		return toChar(ocean);	//Returns an ocean tile as a last resort/error recovery method
@@ -122,7 +139,7 @@ namespace utilities
 		return data;
 	}
 
-	vector<string> separateStringsBySpaces(string str)
+	vector<string> separateStringsBySpaces(string str)		//Separates a string into a vector of strings, using spaces as separators (i.e. "A B C" -> {a,b,c})
 	{
 		vector<string> ret;
 
@@ -194,6 +211,14 @@ namespace utilities
 		if(convert.fail()) throw convert_fail_intStr;
 
 		return ret;
+	}
+
+	string toLower(string input)
+	{
+		for(int i = 0; i < input.size(); i++)
+		{
+			input[i] = tolower(input[i]);
+		}
 	}
 };
 
@@ -330,8 +355,8 @@ private:
 	vector<vector<cellContents_type>> board;	//The game board, indexed by x and y coordinates
 	coordi size;								//The dimensions of the game board
 
-	int shots;		//The number of shots the player has taken
-	int shotsMax;	//The maximum number of shots the player can take
+	int shotsMax = 60;	//The maximum number of shots the player can take
+	int shots = shotsMax;		//The number of shots the player has left
 
 	//File loader flags
 	vector<errorstates> fileErrors;
@@ -365,18 +390,76 @@ public:
 
 	bool isValidPosition(coordi pos)		//Returns true when 'pos' is a valid position within the game board
 	{
-		return (0 < pos.x && pos.x < size.x) && (0 < pos.y && pos.y < size.y);
+		return (0 <= pos.x && pos.x < size.x) && (0 <= pos.y && pos.y < size.y);
 	}
 
 	cellContents_type getContents(coordi pos)	//Returns the contents of a cell, after making sure that the cell is valid
 	{
-		if(isValidPosition(pos)) return board[pos.x][pos.y];
-		return invalid_cell;	//It's only possible to reach this part if 'pos' is an invalid position
+		if(!(0 <= pos.x && pos.x < size.x)) throw board_badX;
+		if(!(0 <= pos.y && pos.y < size.y)) throw board_badY;
+		return board[pos.x][pos.y];
+	}
+
+	void setContents(coordi pos, cellContents_type cell)
+	{
+		if(!(0 <= pos.x && pos.x < size.x)) throw board_badX;
+		if(!(0 <= pos.y && pos.y < size.y)) throw board_badY;
+		board[pos.x][pos.y] = cell;
 	}
 
 	bool createShip(coordi startingPoint, direction_type direction = north, int length = 1)
 	{
 
+	}
+
+	int getShots() { return shots; }
+
+	void checkWinLoss()			//Checks the game data for win/loss conditions
+	{
+		if(shots <= 0)	//If the player is out of shots
+		{
+			gameState = lose; 
+		}
+	}
+
+	shotResult fire(coordi at)	//Returns true if the shot hit something, otherwise false
+	{
+		if(shots <= 0)		//If we have no shots remaining, we cannot fire.
+		{
+			gameState = lose;
+			return noAmmo;
+		}
+
+		shots--;
+
+		cellContents_type cell = getContents(at);
+
+		switch(cell)
+		{
+			case ship:
+				setContents(at, destroyed_ship);
+				return hit;
+
+			case destroyed_ship:
+				return alreadyFired;
+
+			case shot_miss:
+				return alreadyFired;
+
+			case ocean:
+				setContents(at, shot_miss);
+				return miss;
+
+			default:
+				setContents(at, shot_miss);
+				return miss;
+				//If we don't have a case for the cell, assume it's data is bad and set it as a missed shot
+		}
+	}
+
+	bool fire(char _let, int _num)		//Returns true if the shot hit something, otherwise returns false
+	{
+		return fire(coordi(toupper(_let) - 65 + 1, _num));
 	}
 
 	void loadFromFile(ifstream & file)		//Loads the game board from 'file'
@@ -425,25 +508,11 @@ public:
 		printErrors();
 	}
 
-
 	void loadFromFile(string filename)		//Loads the game board from a file, 'filename' 
 	{
 		ifstream file;
 		file.open(filename);
 		loadFromFile(file);	
-	}
-
-	void print()
-	{
-		coordi displacement = coordi(3, 2);		//The coordinates of the upper left portion of the board on the buffer
-
-		for(int y = 0; y < size.y; y++)
-		{
-			for(int x = 0; x < size.x; x++)
-			{
-				screen.write(coordi(x * 2, y) + displacement, utilities::toChar(getContents(coordi(x, y))));
-			}
-		}
 	}
 
 	void printErrors()
@@ -461,6 +530,22 @@ public:
 			getline(cin, inp);
 		}
 	}
+
+	void print()
+	{
+		coordi displacement = coordi(3, 2);		//The coordinates of the upper left portion of the board on the buffer
+
+		for(int y = 0; y < size.y; y++)
+		{
+			for(int x = 0; x < size.x; x++)
+			{
+				screen.write(coordi(x * 2, y) + displacement, utilities::toChar(getContents(coordi(x, y))));
+			}
+		}
+	}
+
+
+	
 };
 
 gameBoard_type gameBoard(coordi(25, 25));
@@ -572,7 +657,7 @@ void setup()		//General startup actions
 		screen.write(coordi(menuX, menuY + 12), "   ex: fire A5");
 
 		screen.write(coordi(menuX, menuY + 14), "Shots remaining:");
-		//screen.write(coordi(menuX, menuY + 15), "  " + utilities::toString(60)));
+		screen.write(coordi(menuX, menuY + 15), "  " + utilities::toString(gameBoard.getShots()));
 	}
 
 	screen.write(coordi(0, 29), "Please enter a command, Admiral.");
@@ -594,6 +679,11 @@ void gameplayLoop()
 	if(command.size() == 0)
 	{
 		//The user typed nothing
+	}
+	else if(utilities::toLower(command[0]) == "fire")
+	{
+
+
 	}
 
 
