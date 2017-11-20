@@ -1,6 +1,7 @@
 #include <iostream>
 #include <fstream>
 #include <string>
+#include <sstream>
 #include <vector>
 
 using std::cin;
@@ -71,19 +72,29 @@ enum errorstates {			//Various errors that can be thrown
 	buffer_yToSmall,	//Screen buffer - y value for size is too small
 	buffer_write_badX,	//Screen buffer - writing to screen - x is out of bounds
 	buffer_write_badY,	//Screen buffer - writing to screen - y is out of bounds
+
+	convert_fail_intStr,		//There was an error converting an integer to a string
 };
 
 namespace utilities
 {
-	cellContents_type toCellType(char data)
+	cellContents_type toCellType(char data)				//Converts a char to a cellContents_type 
 	{
-		if(data == '~') return ocean;
-		else if(data == '#') return ship;
-		else if(data == 'H') return destroyed_ship;
-		else return invalid_cell;
+		switch(data)
+		{
+			case '~':
+				return ocean;
+
+			case '#':
+				return ship;
+
+			case 'H':
+				return destroyed_ship;
+		}
+		return ocean;		//Returns ocean as a last resort/error recovery method
 	}
 
-	char toChar(cellContents_type data)
+	char toChar(cellContents_type data)					//Converts cellContents_type to a char
 	{
 		switch(data)
 		{
@@ -110,6 +121,79 @@ namespace utilities
 		return data;
 	}
 
+	vector<string> separateStringsBySpaces(string str)
+	{
+		vector<string> ret;
+
+		string data = "";
+
+		for(auto iter = str.begin(); iter != str.end(); iter++)
+		{
+			if(*iter == ' ')
+			{
+				ret.push_back(data);
+				data == "";
+			}
+			else data.push_back(*iter);
+		}
+		ret.push_back(data);
+
+		return ret;
+	}
+
+	string errorStateToString(errorstates err)
+	{
+		switch(err)
+		{
+			case noerror:
+				return "No error was encountered.";
+
+			case file_notFound:
+				return "File: File not found";
+
+			case file_eof:
+				return "File: File ended unexpectedly.";
+
+			case file_eof_fatal:
+				return "File: File ended unexpectedly (was not able to recover).";
+
+			case file_lineTooShort:
+				return "File: The line ended unexpectedly.";
+
+			case file_lineTooLong:
+				return "File: The line was longer than expected.";
+
+			case buffer_xToSmall:
+				return "Screen buffer: Attempted to create a buffer with width < 1";
+
+			case buffer_yToSmall:
+				return "Screen buffer: Attempted to create a buffer with height < 1";
+
+			case buffer_write_badX:
+				return "Screen buffer: Attempted to write to a position that does not exist (x < 0)";
+			
+			case buffer_write_badY:
+				return "Screen buffer: Attempted to write to a position that does not exist (x > buffer size)";
+
+			case convert_fail_intStr:
+				return "Data conversion: Integer -> String: Conversion failed.";
+		}
+
+		return "Unknown error.";
+	}
+
+	string toString(int value)
+	{
+		string ret;
+
+		std::stringstream convert;
+		convert << value;
+		convert >> ret;
+
+		if(convert.fail()) throw convert_fail_intStr;
+
+		return ret;
+	}
 };
 
 void clearConsole()
@@ -166,7 +250,7 @@ public:
 			{
 				std::cout << buffer[x][y];
 			}
-			std::cout << '|' << std::endl;
+			std::cout << std::endl;
 		}
 	}
 	
@@ -319,6 +403,8 @@ public:
 				}
 			}
 		}
+
+		printErrors();
 	}
 
 
@@ -331,7 +417,7 @@ public:
 
 	void print(bool clearScreenBefore = true)		//TODO: rework to use the screen buffer
 	{
-		coordi displacement = coordi(1, 1);		//The coordinates of the upper left portion of the board on the buffer
+		coordi displacement = coordi(3, 2);		//The coordinates of the upper left portion of the board on the buffer
 		if(clearScreenBefore) clearConsole();
 
 		for(int y = 0; y < size.y; y++)
@@ -343,12 +429,45 @@ public:
 		}
 	}
 
+	void printErrors()
+	{
+		if(fileErrors.size() > 0)
+		{
+			cout << "The following errors were encountered when loading the file, but were recovered from:" << endl;
+			for(auto iter = fileErrors.begin(); iter != fileErrors.end(); iter++)
+			{
+				cout << utilities::errorStateToString(*iter) << endl;
+			}
+
+			cout << endl << "Press enter to continue" << endl;
+			string inp;
+			getline(cin, inp);
+		}
+	}
 };
 
 gameBoard_type gameBoard(coordi(25, 25));
 
+void promptUserToResizeWindow()		//Prompts the user to resize their window so that it is the correct height for the game
+{
+	cout << "You should be able to see this message along with the bottom one." << endl;
+
+	for(int i = 1; i < 27; i++)
+	{
+		cout << endl;
+	}
+	cout << "Please resize your window so that you can see this message and the" << endl << "message at the top at the same time." << endl;
+	cout << "Please press enter when you're done.";
+	{	//Waits until the user presses enter to continue.  I would use cin.ignore(numeric_limits<streamsize>::max(), '\n'), but numeric_limits is missing for some reason
+		string inp;
+		getline(cin, inp);
+	}
+	clearConsole();
+}
+
 void setup()		//General startup actions
 {
+	promptUserToResizeWindow();
 	gameState = running;
 
 	//Load level data
@@ -363,40 +482,116 @@ void setup()		//General startup actions
 			if(error == file_notFound) cout << "An error was encoutered: The file could not be found." << endl;
 			else cout << "An unspecified error was encountered." << endl;
 		}
+
 	}
 
-	screen.setSize(coordi(25 * 2 + 20, 25 + 2));
+	screen.setSize(coordi(77, 30));
 
 	//Draw border for game board
 	{
+		const int xMin = 2;
+		const int xMax = 52;
+		const int yMin = 1;
+		const int yMax = 27;
+
 		//Top and bottom border
-		for(int x = 1; x < 50; x++)
+		for(int x = xMin; x < xMax; x++)
 		{
-			screen.write(coordi(x, 0), char(205));
-			screen.write(coordi(x, 26), char(205));
+			screen.write(coordi(x, yMin), char(205));
+			screen.write(coordi(x, yMax), char(205));
 		}
 
 		//The left and right border
-		for(int y = 1; y < 25 + 1; y++)
+		for(int y = yMin; y < yMax; y++)
 		{
-			screen.write(coordi(0, y), char(186));
-			screen.write(coordi(50, y), char(186));
+			screen.write(coordi(xMin, y), char(186));
+			screen.write(coordi(xMax, y), char(186));
 		}
 
 		//The corners
-		screen.write(coordi(0, 0), char(201));	//Top left
-		screen.write(coordi(50, 0), char(187));	//Top right
-		screen.write(coordi(0, 26), char(200));	//Bottom left
-		screen.write(coordi(50, 26), char(188));//Bottom right
+		screen.write(coordi(xMin, yMin), char(201));	//Top left
+		screen.write(coordi(xMax, yMin), char(187));	//Top right
+		screen.write(coordi(xMin, yMax), char(200));	//Bottom left
+		screen.write(coordi(xMax, yMax), char(188));//Bottom right
 
 		//game board title 
-		screen.write(coordi(19, 0), char(185));
-		screen.write(coordi(30, 0), char(204));
-		screen.write(coordi(20, 0), "Game Board");
+		screen.write(coordi(xMin + 19, yMin), char(185));	//The left and right borders for the title
+		screen.write(coordi(xMin + 30, yMin), char(204));
+		screen.write(coordi(xMin + 20, yMin), "Game Board");
 	}
 
-	screen.pushToConsole();
-	cin.get();
+	//Write the coordinate indexes along the edge of the board
+	{
+		//Letters along the top
+		for(int x = 0; x < 25; x++)
+		{
+			screen.write(coordi(x * 2 + 3, 0), char(65 + x));
+		}
+
+		//Numbers down the side 
+		for(int y = 0; y < 25; y++)
+		{
+			screen.write(coordi(0, y+2), utilities::toString(y));
+		}
+	}
+
+	//Draw the instructions to the right side of the screen
+	{
+		const int menuX = 54;
+		const int menuY = 2;
+
+		screen.write(coordi(menuX, menuY), "Key:");
+		screen.write(coordi(menuX, menuY + 1), "~ = ocean tile");
+		screen.write(coordi(menuX, menuY + 2), "H = hit");
+		screen.write(coordi(menuX, menuY + 3), "M = miss");
+
+		screen.write(coordi(menuX, menuY + 5), "Commands:");
+		screen.write(coordi(menuX, menuY + 6), "help");
+		screen.write(coordi(menuX, menuY + 7), "   shows help");
+
+		screen.write(coordi(menuX, menuY + 9), "fire <letter><number>");
+		screen.write(coordi(menuX, menuY + 10), "   fires at the");
+		screen.write(coordi(menuX, menuY + 11), "   specified location");
+		screen.write(coordi(menuX, menuY + 12), "   ex: fire A5");
+	}
+
+	screen.write(coordi(0, 29), "Please enter a command, Admiral.");
+
+}
+
+void processGameCommands()
+{
+	string input;
+	getline(cin, input);	//get input from the user
+
+	vector<string> command = utilities::separateStringsBySpaces(input);
+
+	if(command.size() == 0)
+	{
+
+	}
+
+
+}
+
+
+void mainLoop()
+{
+	switch(gameState)
+	{
+		case title:
+
+			break;
+
+		case running:
+			processGameCommands();
+			gameBoard.print();
+			screen.pushToConsole();
+			break;
+
+
+		
+	}
 }
 
 int main()
@@ -404,8 +599,8 @@ int main()
 	setup();
 
 
-	gameBoard.print();
-	screen.pushToConsole();
+	mainLoop();
+	
 
 
 
