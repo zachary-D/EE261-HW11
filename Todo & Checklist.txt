@@ -8,7 +8,10 @@ Moodle requirements
 
 To-Do List
 ----------
-1) Write a UI to handle 
+1) Write a UI
+	a) Declare some constants/variables to correspond with various points on screen
+		1) The edges of the game board
+		2) The positions of menu items
 
 
 
@@ -17,3 +20,5 @@ Bonus Goals
 1) Cutscene engine (Define another screen buffer that plays the cutscene)
 	a) Ships firing, ships being hit, shots hitting the ocean (miss)
 	b) Victory/loss screen? (Flag?)
+
+2) Write UI that dynamically resizes itself based upon the size of the game board

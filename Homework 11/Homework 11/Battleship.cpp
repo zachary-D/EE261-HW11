@@ -22,6 +22,7 @@ enum gameState_type		//The current state the game is in
 	error,				//The game has encountered an error that cannot be recovered from
 	win,				//The player has won
 	lose,				//The player has lost
+	quitting,			//The player has requested the program quit
 } gameState;
 
 struct coordi	//A coordinate pair of integers
@@ -136,7 +137,7 @@ namespace utilities
 			}
 			else data.push_back(*iter);
 		}
-		ret.push_back(data);
+		if(data != "") ret.push_back(data);
 
 		return ret;
 	}
@@ -254,22 +255,36 @@ public:
 		}
 	}
 	
-	void write(coordi pos, char value)
+	void write(coordi pos, char value, bool noFail = false)	//Writes a character ('value') to the buffer at 'pos', if noFail == true, the function will not throw any exceptions
 	{
-		if(!(0 <= pos.x && pos.x < size.x)) throw buffer_write_badX;
-		if(!(0 <= pos.y && pos.y < size.y)) throw buffer_write_badY;
+		if(!(0 <= pos.x && pos.x < size.x))
+		{
+			if(noFail) return;
+			else throw buffer_write_badX;
+		}
+		if(!(0 <= pos.y && pos.y < size.y))
+		{
+			if(noFail) return;
+			else throw buffer_write_badY;
+		}
 
 		buffer[pos.x][pos.y] = value;
 	}
 
-	void write(coordi pos, string value)
+	void write(coordi pos, string value, bool noFail = false)	//Writes a string ('value') to the buffer, starting at 'pos'
+		//If noFail == true, the function will not throw any exceptions, and instead will write as much as it can, giving up if it cannot do something
 	{
-		if(!(0 <= pos.x && pos.x + value.size()< size.x)) throw buffer_write_badX;
-		if(!(0 <= pos.y && pos.y < size.y)) throw buffer_write_badY;
-
 		for(int i = 0; i < value.size(); i++)
 		{
-			write(pos + coordi(i, 0), value[i]);
+			write(pos + coordi(i, 0), value[i], noFail);
+		}
+	}
+
+	void clearRow(int y, char clearWith = ' ')		//Replaces an entire row with 'clearWidth', which is a space by default
+	{
+		for(int x = 0; x < size.x; x++)
+		{
+			buffer[x][y] = clearWith;
 		}
 	}
 };
@@ -277,7 +292,7 @@ public:
 screenBuffer_type screen;
 
 class gameBoard_type		//A game board.  Set up as a class so 2-person play is possible, and also to add data validation functions (i.e. don't let things read/write to [-1, 6], etc)
-{
+{							//The board also contains some other gameplay data, i.e. number of shots remaining
 public:
 	gameBoard_type::gameBoard_type(coordi boardSize) {
 		size = boardSize;
@@ -314,6 +329,9 @@ public:
 private:
 	vector<vector<cellContents_type>> board;	//The game board, indexed by x and y coordinates
 	coordi size;								//The dimensions of the game board
+
+	int shots;		//The number of shots the player has taken
+	int shotsMax;	//The maximum number of shots the player can take
 
 	//File loader flags
 	vector<errorstates> fileErrors;
@@ -415,10 +433,9 @@ public:
 		loadFromFile(file);	
 	}
 
-	void print(bool clearScreenBefore = true)		//TODO: rework to use the screen buffer
+	void print()
 	{
 		coordi displacement = coordi(3, 2);		//The coordinates of the upper left portion of the board on the buffer
-		if(clearScreenBefore) clearConsole();
 
 		for(int y = 0; y < size.y; y++)
 		{
@@ -452,7 +469,7 @@ void promptUserToResizeWindow()		//Prompts the user to resize their window so th
 {
 	cout << "You should be able to see this message along with the bottom one." << endl;
 
-	for(int i = 1; i < 27; i++)
+	for(int i = 1; i < 28; i++)
 	{
 		cout << endl;
 	}
@@ -512,7 +529,7 @@ void setup()		//General startup actions
 		screen.write(coordi(xMin, yMin), char(201));	//Top left
 		screen.write(coordi(xMax, yMin), char(187));	//Top right
 		screen.write(coordi(xMin, yMax), char(200));	//Bottom left
-		screen.write(coordi(xMax, yMax), char(188));//Bottom right
+		screen.write(coordi(xMax, yMax), char(188));	//Bottom right
 
 		//game board title 
 		screen.write(coordi(xMin + 19, yMin), char(185));	//The left and right borders for the title
@@ -553,22 +570,30 @@ void setup()		//General startup actions
 		screen.write(coordi(menuX, menuY + 10), "   fires at the");
 		screen.write(coordi(menuX, menuY + 11), "   specified location");
 		screen.write(coordi(menuX, menuY + 12), "   ex: fire A5");
+
+		screen.write(coordi(menuX, menuY + 14), "Shots remaining:");
+		//screen.write(coordi(menuX, menuY + 15), "  " + utilities::toString(60)));
 	}
 
 	screen.write(coordi(0, 29), "Please enter a command, Admiral.");
 
 }
 
-void processGameCommands()
+void gameplayLoop()
 {
+	//Push the newest data to the screen
+	gameBoard.print();
+	screen.pushToConsole();
+
 	string input;
 	getline(cin, input);	//get input from the user
 
 	vector<string> command = utilities::separateStringsBySpaces(input);
 
+	screen.clearRow(28);		//Clear the row used for feedback
 	if(command.size() == 0)
 	{
-
+		//The user typed nothing
 	}
 
 
@@ -577,20 +602,19 @@ void processGameCommands()
 
 void mainLoop()
 {
-	switch(gameState)
+	while(gameState != quitting)
 	{
-		case title:
+		switch(gameState)
+		{
+			case title:
 
-			break;
+				break;
 
-		case running:
-			processGameCommands();
-			gameBoard.print();
-			screen.pushToConsole();
-			break;
+			case running:
+				gameplayLoop();
 
-
-		
+				break;
+		}
 	}
 }
 
