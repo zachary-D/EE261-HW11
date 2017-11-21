@@ -12,6 +12,8 @@ To-Do List
 	a) Declare some constants/variables to correspond with various points on screen
 		1) The edges of the game board
 		2) The positions of menu items
+		
+2) Rework the way the screen buffer prints so that it concatenates all the data and then sends it to the screen (to fix flicker)
 
 
 

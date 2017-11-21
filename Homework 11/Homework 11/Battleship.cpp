@@ -15,6 +15,9 @@ using std::string;
 
 using std::vector;
 
+const bool allowDebugCommands = true;	//Controls whether or not debug commands may be turned on
+bool debugCommandsOn = false;			//Controls if debug commands are turned on
+
 enum gameState_type		//The current state the game is in
 {
 	title,				//The game is on the title screen
@@ -83,9 +86,79 @@ enum errorstates {			//Various errors that can be thrown
 	buffer_write_badY,	//Screen buffer - writing to screen - y is out of bounds
 
 	convert_fail_intStr,		//There was an error converting an integer to a string
+	convert_fail_strInt,		//There was an error ocnverting a string to an integer
 
 	board_badX,			//Game board - The x value is invalid
 	board_badY,			//Game board - The y value is invalid
+};
+
+enum class ASCII		//ASCII characters and their associated integer numbers
+{
+	ZERO = 48,
+	ONE = 49,
+	TWO = 50,
+	THREE = 51,
+	FOUR = 52,
+	FIVE = 53,
+	SIX = 54,
+	SEVEN = 55,
+	EIGHT = 56,
+	NINE = 57,
+
+	A = 65,
+	B = 66,
+	C = 67,
+	D = 68,
+	E = 69,
+	F = 70,
+	G = 71,
+	H = 72,
+	I = 73,
+	J = 74,
+	K = 75,
+	L = 76,
+	M = 77,
+	N = 78,
+	O = 79,
+	P = 80,
+	Q = 81,
+	R = 82,
+	S = 83,
+	T = 84,
+	U = 85,
+	V = 86,
+	W = 87,
+	X = 88,
+	Y = 89,
+	Z = 90,
+
+	a = 97,
+	b = 98,
+	c = 99,
+	d = 100,
+	e = 101,
+	f = 102,
+	g = 103,
+	h = 104,
+	i = 105,
+	j = 106,
+	k = 107,
+	l = 108,
+	m = 109,
+	n = 110,
+	o = 111,
+	p = 112,
+	q = 113,
+	r = 114,
+	s = 115,
+	t = 116,
+	u = 117,
+	v = 118,
+	w = 119,
+	x = 120,
+	y = 121,
+	z = 122,
+
 };
 
 namespace utilities
@@ -102,14 +175,14 @@ namespace utilities
 
 			case 'H':
 				return destroyed_ship;
-				
+
 			case 'M':
 				return shot_miss;
 		}
 		return ocean;		//Returns ocean as a last resort/error recovery method
 	}
 
-	char toChar(cellContents_type data)					//Converts cellContents_type to a char
+	char toChar(cellContents_type data, bool showHiddenShips = false)					//Converts cellContents_type to a char
 	{
 		switch(data)
 		{
@@ -117,7 +190,7 @@ namespace utilities
 				return '~';
 
 			case ship:
-				return toChar(ocean);	//Display as ocean (they're hidden!)
+				return (showHiddenShips ? '#' : toChar(ocean));	//Display as ocean if they're hidden, otherwise show as '#'
 
 			case destroyed_ship:
 				return 'H';
@@ -150,7 +223,7 @@ namespace utilities
 			if(*iter == ' ')
 			{
 				ret.push_back(data);
-				data == "";
+				data = "";
 			}
 			else data.push_back(*iter);
 		}
@@ -189,7 +262,7 @@ namespace utilities
 
 			case buffer_write_badX:
 				return "Screen buffer: Attempted to write to a position that does not exist (x < 0)";
-			
+
 			case buffer_write_badY:
 				return "Screen buffer: Attempted to write to a position that does not exist (x > buffer size)";
 
@@ -213,12 +286,51 @@ namespace utilities
 		return ret;
 	}
 
+	double toNum(string inp)
+	{
+		double ret;
+
+		std::stringstream convert;
+		convert << inp;
+		convert >> ret;
+
+		if(convert.fail()) throw convert_fail_strInt;
+
+		return ret;
+	}
+
+	bool isNum(string inp)
+	{
+		try
+		{
+			toNum(inp);
+		}
+		catch(...)			//If any exception is triggered while converting 'inp' to a number, it can be assumed that 'inp' is not a number
+		{
+			return false;
+		}
+
+		return true;
+	}
+
 	string toLower(string input)
 	{
 		for(int i = 0; i < input.size(); i++)
 		{
 			input[i] = tolower(input[i]);
 		}
+		return input;
+	}
+
+	bool isCharLetter(char inp)	//Is the character 'inp'  a->z or A->Z
+	{
+		inp = tolower(inp);
+		return 'a' <= inp && inp <= 'z';
+	}
+
+	bool isCharNum(char inp)	//Is the character the CHARACTER for 0->9, NOT if the char ID is 0->9
+	{
+		return (int) ASCII::ZERO <= inp && (int) inp <= (int) ASCII::NINE;
 	}
 };
 
@@ -238,7 +350,7 @@ public:
 		if(_size.x < 1) throw buffer_xToSmall;
 		if(_size.y < 1) throw buffer_yToSmall;
 		size = _size;
-	
+
 		//While the buffer is larger than it should be
 		while(size.x < buffer.size())
 		{
@@ -279,7 +391,7 @@ public:
 			std::cout << std::endl;
 		}
 	}
-	
+
 	void write(coordi pos, char value, bool noFail = false)	//Writes a character ('value') to the buffer at 'pos', if noFail == true, the function will not throw any exceptions
 	{
 		if(!(0 <= pos.x && pos.x < size.x))
@@ -418,7 +530,7 @@ public:
 	{
 		if(shots <= 0)	//If the player is out of shots
 		{
-			gameState = lose; 
+			gameState = lose;
 		}
 	}
 
@@ -459,7 +571,7 @@ public:
 
 	bool fire(char _let, int _num)		//Returns true if the shot hit something, otherwise returns false
 	{
-		return fire(coordi(toupper(_let) - 65 + 1, _num));
+		return fire(coordi(toupper(_let) - 'A', _num));		//the letter coordinate is determined by toupper(_let) - 'A' because that means when _let == 'A', the result will be 0
 	}
 
 	void loadFromFile(ifstream & file)		//Loads the game board from 'file'
@@ -469,7 +581,7 @@ public:
 			//File does not exist
 			throw file_notFound;
 		}
-		
+
 		//Load each line from the file, and store it in each row
 		for(int y = 0; y < size.y; y++)
 		{
@@ -512,7 +624,7 @@ public:
 	{
 		ifstream file;
 		file.open(filename);
-		loadFromFile(file);	
+		loadFromFile(file);
 	}
 
 	void printErrors()
@@ -531,7 +643,7 @@ public:
 		}
 	}
 
-	void print()
+	void print(bool showHiddenShips = false)
 	{
 		coordi displacement = coordi(3, 2);		//The coordinates of the upper left portion of the board on the buffer
 
@@ -539,13 +651,16 @@ public:
 		{
 			for(int x = 0; x < size.x; x++)
 			{
-				screen.write(coordi(x * 2, y) + displacement, utilities::toChar(getContents(coordi(x, y))));
+				screen.write(coordi(x * 2, y) + displacement, utilities::toChar(getContents(coordi(x, y)), showHiddenShips));
 			}
 		}
+
+		screen.write(coordi(54 + 2, 2 + 15), "     ", true);
+		screen.write(coordi(54 + 2, 2 + 15), utilities::toString(getShots()));
 	}
 
 
-	
+
 };
 
 gameBoard_type gameBoard(coordi(25, 25));
@@ -633,7 +748,7 @@ void setup()		//General startup actions
 		//Numbers down the side 
 		for(int y = 0; y < 25; y++)
 		{
-			screen.write(coordi(0, y+2), utilities::toString(y));
+			screen.write(coordi(0, y + 2), utilities::toString(y));
 		}
 	}
 
@@ -657,14 +772,19 @@ void setup()		//General startup actions
 		screen.write(coordi(menuX, menuY + 12), "   ex: fire A5");
 
 		screen.write(coordi(menuX, menuY + 14), "Shots remaining:");
-		screen.write(coordi(menuX, menuY + 15), "  " + utilities::toString(gameBoard.getShots()));
+
 	}
 
 	screen.write(coordi(0, 29), "Please enter a command, Admiral.");
 
 }
 
-void gameplayLoop()
+void printPlayerFeedback(string feedback)
+{
+
+}
+
+void handlePlayerCommands()
 {
 	//Push the newest data to the screen
 	gameBoard.print();
@@ -673,18 +793,79 @@ void gameplayLoop()
 	string input;
 	getline(cin, input);	//get input from the user
 
-	vector<string> command = utilities::separateStringsBySpaces(input);
+	vector<string> command = utilities::separateStringsBySpaces(utilities::toLower(input));
 
 	screen.clearRow(28);		//Clear the row used for feedback
 	if(command.size() == 0)
 	{
 		//The user typed nothing
 	}
-	else if(utilities::toLower(command[0]) == "fire")
+	else if(command[0] == "fire")
 	{
+		if(gameState != running)
+		{
+			screen
+		}
+		else
+		{
+			if(command.size() < 2)
+			{
+				screen.write(coordi(0, 28), "Please specify a firing coordinate.");
+				return;
+			}
+			else
+			{
+				string pos = command[1];
+
+				if(pos.size() >= 2) //If the command is at least two characters long
+				{
+					char first = pos[0];
+					string second = pos.substr(1);
+
+					if(!utilities::isCharLetter(first) || !utilities::isNum(second))		//If either part of the coordinate is invalid (if the first character is not a letter, and if the remaining text is not a number
+					{
+						screen.write(coordi(0, 28), "Sorry Admiral, firing coordinate \"" + pos + "\" is invalid.  Please try again.", true);
+						return;
+					}
+					else
+					{
+						try
+						{
+							gameBoard.fire(first, utilities::toNum(second));
+						}
+						catch(errorstates err)
+						{
+							if(err == board_badX || err == board_badY)	//If the user fired at an invalid point
+							{
+								screen.write(coordi(0, 28), "Sorry Admiral, firing coordinate \"" + pos + "\" is invalid.  Please try again.", true);
+							}
+							else throw err;		//If we can't handle it here, just pass it up the 'chain'
+						};
+					}
+				}
+				else
+				{
+					screen.write(coordi(0, 28), "Sorry Admiral, firing coordinate \"" + pos + "\" is invalid.  Please try again.", true);
+					return;
+				}
+			}
+
+		}
 
 
 	}
+
+
+}
+
+
+void lossScreen()
+{
+	gameBoard.print(true);
+
+
+
+	screen.pushToConsole();
 
 
 }
@@ -694,6 +875,9 @@ void mainLoop()
 {
 	while(gameState != quitting)
 	{
+
+		handlePlayerCommands();
+
 		switch(gameState)
 		{
 			case title:
@@ -701,8 +885,11 @@ void mainLoop()
 				break;
 
 			case running:
-				gameplayLoop();
+				//gameplayLoop();
 
+				break;
+			case lose:
+				lossScreen();
 				break;
 		}
 	}
@@ -714,7 +901,7 @@ int main()
 
 
 	mainLoop();
-	
+
 
 
 
