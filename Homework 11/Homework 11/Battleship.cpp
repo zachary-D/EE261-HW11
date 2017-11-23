@@ -817,14 +817,6 @@ void printPlayerFeedback(string feedback)		//Prints 'feedback' for the player to
 
 void handlePlayerCommands()
 {
-	//Push the newest data to the screen
-	gameBoard.print(debug_showShips && debugCommandsOn);
-
-	if(gameState != running) printPlayerFeedback("The gameState != running.  Enter #forceRun to prevent the game from closing.");
-
-
-	screen.pushToConsole();
-
 	if(gameState == running || debugCommandsOn == true)
 	{
 
@@ -1031,30 +1023,35 @@ void mainLoop()
 {
 	while(gameState != quitting)
 	{
-		gameBoard.checkWinLoss();
-
-		handlePlayerCommands();
-
-		if(debug_forceRun && debugCommandsOn) gameState = running;
-
-		switch(gameState)
+		if(gameState == title)
 		{
-			case title:
 
-				break;
+		}
+		else
+		{
+			//Check for win/loss conditions
+			gameBoard.checkWinLoss();
 
-			case running:
-				
+			//Push the newest data to the screen
+			gameBoard.print(debug_showShips && debugCommandsOn);
 
-				break;
+			if(gameState != running && gameState != title) printPlayerFeedback("gameState != running.  Enter #forceRun to prevent the game from closing.");
+			screen.pushToConsole();
 
-			case lose:
-				lossScreen();
-				break;
+			handlePlayerCommands();
 
-			case win:
-				winScreen();
-				break;
+			if(debug_forceRun && debugCommandsOn) gameState = running;
+
+			switch(gameState)
+			{
+				case lose:
+					lossScreen();
+					break;
+
+				case win:
+					winScreen();
+					break;
+			}
 		}
 	}
 }

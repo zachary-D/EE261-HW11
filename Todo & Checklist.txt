@@ -8,12 +8,12 @@ Moodle requirements
 
 To-Do List
 ----------
-1) Write a UI
+1) Write a UI -- delayed
 	a) Declare some constants/variables to correspond with various points on screen
 		1) The edges of the game board
 		2) The positions of menu items
 		
-2) Rework the way the screen buffer prints so that it concatenates all the data and then sends it to the screen (to fix flicker)
+2) Rework the way the screen buffer prints so that it concatenates all the data and then sends it to the screen (to fix flicker) -- Didn't make a difference
 
 3) Write a title screen
 	a) allow the user to choose to load from a file/generate a new board
@@ -29,8 +29,8 @@ Bugs
 
 Bonus Goals
 -----------
-1) Cutscene engine (Define another screen buffer that plays the cutscene)
+1) Cutscene engine (Define another screen buffer that plays the cutscene) [may not work well if the flicker bug isn't fixed]
 	a) Ships firing, ships being hit, shots hitting the ocean (miss)
-	b) Victory/loss screen? (Flag?)
+	b) Victory/loss screen? (Flag/sinking ship?)
 
 2) Write UI that dynamically resizes itself based upon the size of the game board
