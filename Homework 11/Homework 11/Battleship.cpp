@@ -90,7 +90,8 @@ enum errorstates {			//Various errors that can be thrown
 	buffer_write_badY,	//Screen buffer - writing to screen - y is out of bounds
 
 	convert_fail_intStr,		//There was an error converting an integer to a string
-	convert_fail_strInt,		//There was an error ocnverting a string to an integer
+	convert_fail_strInt,		//There was an error converting a string to an integer
+	convert_fail_charInt,		//There was an error converting a char to an integer
 
 	board_badX,			//Game board - The x value is invalid
 	board_badY,			//Game board - The y value is invalid
@@ -286,6 +287,19 @@ namespace utilities
 		convert >> ret;
 
 		if(convert.fail()) throw convert_fail_intStr;
+
+		return ret;
+	}
+
+	double toNum(char inp, bool noFail = false)
+	{
+		double ret;
+
+		std::stringstream convert;
+		convert << inp;
+		convert >> ret;
+
+		if(convert.fail() && noFail == false) throw convert_fail_charInt;
 
 		return ret;
 	}
@@ -550,6 +564,7 @@ public:
 						break;
 					}
 				}
+				if(shipFound) break;
 			}
 
 			if(shipFound == false) gameState = win;
@@ -655,6 +670,7 @@ public:
 		ifstream file;
 		file.open(filename);
 		loadFromFile(file);
+		file.close();
 	}
 
 	void printErrors()
@@ -715,22 +731,7 @@ void promptUserToResizeWindow()		//Prompts the user to resize their window so th
 void setup()		//General startup actions
 {
 	promptUserToResizeWindow();
-	gameState = running;
-
-	//Load level data
-	{
-		cout << "Attempting to load level data..." << endl;
-		try
-		{
-			gameBoard.loadFromFile("levelData.dat");
-		}
-		catch(errorstates error)
-		{
-			if(error == file_notFound) cout << "An error was encoutered: The file could not be found." << endl;
-			else cout << "An unspecified error was encountered." << endl;
-		}
-
-	}
+	gameState = title;
 
 	screen.setSize(coordi(77, 30));
 
@@ -815,170 +816,97 @@ void printPlayerFeedback(string feedback)		//Prints 'feedback' for the player to
 		//Also add a debug command mode so you can tweak game variables as it runs
 }
 
+bool handleDebugCommands(vector<string> command)		//Checks for and executes debug commands in 'command' if they exist.  Returns 'true' if it is a debug command, false if not
+{
+	if(command.size() == 0) return false;	//If the argument isn't a command, it can't be a debug command
+
+	if(command[0].size() > 0 && command[0][0] == '#' && allowDebugCommands == true)		//Debug command handler (requires that allowDebugCommands be true to enable them)
+	{
+		command[0] = command[0].substr(1);	//Trims the '#' from the beginning of the first term to make things more readable
+
+		if(debugCommandsOn == false)				//If debug commands are enabled
+		{
+			if(command[0] == "enable")				//Enables debug commands
+			{
+				debugCommandsOn = true;
+				printPlayerFeedback("Debug commands enabled.  #disable to turn them off.");
+				return true;
+			}
+		}
+		else
+		{
+			if(command[0] == "enable")				//Debug commands are already on, so we just say so. 
+			{
+				printPlayerFeedback("Debug commands are already enabled.");
+				return true;
+			}
+			else if(command[0] == "disable")		//Disables debug commands
+			{
+				debugCommandsOn = false;
+				printPlayerFeedback("Debug commands are now disabled.");
+				return true;
+			}
+			else if(command[0] == "setshots")		//Sets the number of shots the player has remaining
+			{
+				if(command.size() >= 2)
+				{
+					try
+					{
+						gameBoard.setShots(utilities::toNum(command[1]));
+					}
+					catch(errorstates err)
+					{
+						if(err == convert_fail_strInt)
+						{
+							printPlayerFeedback("\"" + command[1] + "\" could not be converted to an integer.");
+						}
+						else throw err;
+					}
+
+				}
+			}
+			else if(command[0] == "forcerun")	//Forces the game to run, preventing it from closing
+			{
+				debug_forceRun = true;
+			}
+			else if(command[0] == "normalrun")	//Disables forceRun, returns the game to it's normal state
+			{
+				debug_forceRun = false;
+			}
+			else if(command[0] == "showships")
+			{
+				debug_showShips = true;
+			}
+			else if(command[0] == "hideships")
+			{
+				debug_showShips = false;
+			}
+			else if(command[0] == "killall")
+			{
+				for(int x = 0; x < gameBoard.getBoardSize().x; x++)
+				{
+					for(int y = 0; y < gameBoard.getBoardSize().y; y++)
+					{
+						if(gameBoard.getContents(coordi(x, y)) == ship)
+						{
+							gameBoard.setContents(coordi(x, y), destroyed_ship);
+						}
+					}
+				}
+			}
+		}
+	}
+	else return false;
+
+	return true;
+}
+
 void handlePlayerCommands()
 {
-	if(gameState == running || debugCommandsOn == true)
-	{
-
-		string input;
-		getline(cin, input);	//get input from the user
 
 
-		vector<string> command = utilities::separateStringsBySpaces(utilities::toLower(input));
-
-		screen.clearRow(28);		//Clear the row used for feedback
-
-		if(input.size() > 0 && input[0] == '#' && allowDebugCommands == true)		//Debug command handler (requires that allowDebugCommands be true to enable them)
-		{
-			command[0] = command[0].substr(1);	//Trims the '#' from the beginning of the first term to make things more readable
-
-			if(debugCommandsOn == false)				//If debug commands are enabled
-			{
-				if(command[0] == "enable")				//Enables debug commands
-				{
-					debugCommandsOn = true;
-					printPlayerFeedback("Debug commands enabled.  #disable to turn them off.");
-					return;
-				}
-			}
-			else
-			{
-				if(command[0] == "enable")				//Debug commands are already on, so we just say so. 
-				{
-					printPlayerFeedback("Debug commands are already enabled.");
-					return;
-				}
-				else if(command[0] == "disable")		//Disables debug commands
-				{
-					debugCommandsOn = false;
-					printPlayerFeedback("Debug commands are now disabled.");
-					return;
-				}
-				else if(command[0] == "setshots")		//Sets the number of shots the player has remaining
-				{
-					if(command.size() >= 2)
-					{
-						try
-						{
-							gameBoard.setShots(utilities::toNum(command[1]));
-						}
-						catch(errorstates err)
-						{
-							if(err == convert_fail_strInt)
-							{
-								printPlayerFeedback("\"" + command[1] + "\" could not be converted to an integer.");
-							}
-							else throw err;
-						}
-
-					}
-				}
-				else if(command[0] == "forcerun")	//Forces the game to run, preventing it from closing
-				{
-					debug_forceRun = true;
-				}
-				else if(command[0] == "normalrun")	//Disables forceRun, returns the game to it's normal state
-				{
-					debug_forceRun = false;
-				}
-				else if(command[0] == "showships")
-				{
-					debug_showShips = true;
-				}
-				else if(command[0] == "hideships")
-				{
-					debug_showShips = false;
-				}
-				else if(command[0] == "killall")
-				{
-					for(int x = 0; x < gameBoard.getBoardSize().x; x++)
-					{
-						for(int y = 0; y < gameBoard.getBoardSize().y; y++)
-						{
-							if(gameBoard.getContents(coordi(x, y)) == ship)
-							{
-								gameBoard.setContents(coordi(x, y), destroyed_ship);
-							}
-						}
-					}
-				}
-			}
-		}
-
-		else if(command.size() == 0)
-		{
-			//The user typed nothing
-		}
-		else if(command[0] == "fire")
-		{
-			if(gameState != running)
-			{
-				printPlayerFeedback("This command cannot be used at this time.");
-			}
-			else
-			{
-				if(command.size() < 2)
-				{
-					printPlayerFeedback("Please specify a firing coordinate.");
-					return;
-				}
-				else
-				{
-					string pos = command[1];
-
-					if(pos.size() >= 2) //If the command is at least two characters long
-					{
-						char first = pos[0];
-						string second = pos.substr(1);
-
-						if(!utilities::isCharLetter(first) || !utilities::isNum(second))		//If either part of the coordinate is invalid (if the first character is not a letter, and if the remaining text is not a number
-						{
-
-							printPlayerFeedback("Sorry Admiral, firing coordinate \"" + pos + "\" is invalid.  Please try again.");
-							return;
-						}
-						else
-						{
-							try
-							{
-								shotResult result = gameBoard.fire(first, utilities::toNum(second));
-
-								if(result == shotResult::alreadyFired)
-								{
-									printPlayerFeedback("You already fired on that location.");
-								}
-								else if(result == shotResult::hit)
-								{
-									printPlayerFeedback("Confirmed hit Admiral!");
-								}
-								else if(result == shotResult::miss)
-								{
-									printPlayerFeedback("We didn't hit anything Admiral.");
-								}
-							}
-							catch(errorstates err)
-							{
-								if(err == board_badX || err == board_badY)	//If the user fired at an invalid point
-								{
-									printPlayerFeedback("Sorry Admiral, firing coordinate \"" + pos + "\" is invalid.  Please try again.");
-								}
-								else throw err;		//If we can't handle it here, just pass it up the 'chain'
-							};
-						}
-					}
-					else
-					{
-						printPlayerFeedback("Sorry Admiral, firing coordinate \"" + pos + "\" is invalid.  Please try again.");
-						return;
-					}
-				}
-
-			}
-
-
-		}
-
-	}
+	//if(gameState == running || debugCommandsOn == true)
+	
 }
 
 
@@ -990,13 +918,13 @@ void lossScreen()
 	screen.clearRow(29);
 
 	printPlayerFeedback("We've lost, Admiral.");
-	screen.write(coordi(0, 29), "Press enter to quit.");
+	screen.write(coordi(0, 29), "Press enter to return to the title screen.");
 	screen.pushToConsole();
 
 
-	cin.get();
+	getline(cin, string());	//Wait for the user to press enter (getline and store it in a new string that will immediatley be deconstructed)
 
-	gameState = quitting;
+	gameState = title;
 
 
 }
@@ -1009,13 +937,13 @@ void winScreen()
 	screen.clearRow(29);
 
 	printPlayerFeedback("We've won, Admiral!");
-	screen.write(coordi(0, 29), "Press enter to quit.");
+	screen.write(coordi(0, 29), "Press enter to return to the title screen.");
 	screen.pushToConsole();
 
 
-	cin.get();
+	getline(cin, string());	//Wait for the user to press enter (getline and store it in a new string that will immediatley be deconstructed)
 
-	gameState = quitting;
+	gameState = title;
 }
 
 
@@ -1025,6 +953,72 @@ void mainLoop()
 	{
 		if(gameState == title)
 		{
+			clearConsole();
+
+			cout << "Please select an option:" << endl;
+
+			cout << "1) Load game board from file" << endl;
+			cout << "2) Generate new game board" << endl;
+			cout << "3) Quit" << endl;
+
+			string input;
+
+			while(true)	//Loop until we get valid data from the player
+			{
+				getline(cin, input);
+
+				if(input.size() == 0 || !(1 <= utilities::toNum(input[0], true) && utilities::toNum(input[0], true) <= 3))
+				{
+					cout << "I'm sorry, I don't understand \"" << input << "\".  Please try again." << endl;
+				}
+				else break;
+			}
+
+			if(input[0] == '1')
+			{
+				string filename = "";
+				while(true)
+				{
+					cout << endl << "Please enter a file to open:";
+
+					getline(cin, filename);
+					if(filename == "")
+					{
+						cout << "Please enter a filename." << endl;
+					}
+					else break;
+				}
+				//Load the game board from a file
+
+				//Load level data
+				{
+					cout << "Attempting to load level data..." << endl;
+					try
+					{
+						gameBoard.emptyBoard();
+						gameBoard.loadFromFile(filename);// "levelData.dat");
+					}
+					catch(errorstates error)
+					{
+						if(error == file_notFound) cout << "An error was encoutered: The file could not be found." << endl;
+						else cout << "An unspecified error was encountered." << endl;
+						cout << "Generating new game board..." << endl;
+					}
+					gameState = running;
+				}
+			}
+			else if(input[0] == '2')
+			{
+				//Generate a new game board
+
+
+			}
+			else if(input[0] == '3')
+			{
+				gameState = quitting;
+			}
+
+			screen.clearRow(28);		//Clear the row used for feedback on the buffer, in case the game has already been run once
 
 		}
 		else
@@ -1035,8 +1029,15 @@ void mainLoop()
 			//Push the newest data to the screen
 			gameBoard.print(debug_showShips && debugCommandsOn);
 
-			if(gameState != running && gameState != title) printPlayerFeedback("gameState != running.  Enter #forceRun to prevent the game from closing.");
+			if(gameState == quitting) printPlayerFeedback("gameState == quitting.  Enter #forceRun to prevent the game from closing.");
 			screen.pushToConsole();
+			
+			string input;
+			if(gameState == running || debugCommandsOn) getline(cin, input);	//get input from the user
+
+			vector<string> command = utilities::separateStringsBySpaces(utilities::toLower(input));
+
+			screen.clearRow(28);		//Clear the row used for feedback
 
 			handlePlayerCommands();
 
@@ -1044,6 +1045,90 @@ void mainLoop()
 
 			switch(gameState)
 			{
+				case running:
+				{
+					if(handleDebugCommands(command))
+					{
+						//Do nothing because the command was already handled
+					}
+					else if(command.size() == 0)
+					{
+						//The user typed nothing
+					}
+					else if(command[0] == "fire")
+					{
+						if(gameState != running)
+						{
+							printPlayerFeedback("This command cannot be used at this time.");
+						}
+						else
+						{
+							if(command.size() < 2)
+							{
+								printPlayerFeedback("Please specify a firing coordinate.");
+								return;
+							}
+							else
+							{
+								string pos = command[1];
+
+								if(pos.size() >= 2) //If the command is at least two characters long
+								{
+									char first = pos[0];
+									string second = pos.substr(1);
+
+									if(!utilities::isCharLetter(first) || !utilities::isNum(second))		//If either part of the coordinate is invalid (if the first character is not a letter, and if the remaining text is not a number
+									{
+
+										printPlayerFeedback("Sorry Admiral, firing coordinate \"" + pos + "\" is invalid.  Please try again.");
+										return;
+									}
+									else
+									{
+										try
+										{
+											shotResult result = gameBoard.fire(first, utilities::toNum(second));
+
+											gameBoard.checkWinLoss();
+
+											if(result == shotResult::alreadyFired)
+											{
+												printPlayerFeedback("You already fired on that location.");
+											}
+											else if(result == shotResult::hit)
+											{
+												printPlayerFeedback("Confirmed hit Admiral!");
+											}
+											else if(result == shotResult::miss)
+											{
+												printPlayerFeedback("We didn't hit anything Admiral.");
+											}
+										}
+										catch(errorstates err)
+										{
+											if(err == board_badX || err == board_badY)	//If the user fired at an invalid point
+											{
+												printPlayerFeedback("Sorry Admiral, firing coordinate \"" + pos + "\" is invalid.  Please try again.");
+											}
+											else throw err;		//If we can't handle it here, just pass it up the 'chain'
+										};
+									}
+								}
+								else
+								{
+									printPlayerFeedback("Sorry Admiral, firing coordinate \"" + pos + "\" is invalid.  Please try again.");
+									return;
+								}
+							}
+
+						}
+
+
+					}
+
+				}
+					break;
+
 				case lose:
 					lossScreen();
 					break;
@@ -1059,7 +1144,6 @@ void mainLoop()
 int main()
 {
 	setup();
-
 
 	mainLoop();
 }

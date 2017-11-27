@@ -1,19 +1,19 @@
 Moodle requirements
 -------------------
-1) Load a game board from a file, using ~ = ocean, # = ship, H = ship hit -- done
-2) Allow the user to fire torpedos at a set of coordinates (a letter then a number, ie B4).  Tell the player if they got a hit, miss, or already fired there -- done
+1) [Done] Load a game board from a file, using ~ = ocean, # = ship, H = ship hit -- done
+2) [Done] Allow the user to fire torpedos at a set of coordinates (a letter then a number, ie B4).  Tell the player if they got a hit, miss, or already fired there -- done
 3) Generate a new game board randomly, according to the specifications in question 2
-4) The user has 60 shots to sink the entire enemy fleet, otherwise they lose.  If they lose, reveal the postions of the enemy ships to the player -- done
+4) [Done] The user has 60 shots to sink the entire enemy fleet, otherwise they lose.  If they lose, reveal the postions of the enemy ships to the player -- done
 
 
 To-Do List
 ----------
-1) Write a UI -- delayed
-	a) Declare some constants/variables to correspond with various points on screen
+1) [Partially complete] Write a UI -- partially complete
+	a) [Delayed] Declare some constants/variables to correspond with various points on screen -- delayed
 		1) The edges of the game board
 		2) The positions of menu items
 		
-2) Rework the way the screen buffer prints so that it concatenates all the data and then sends it to the screen (to fix flicker) -- Didn't make a difference
+2) [Innefective] Rework the way the screen buffer prints so that it concatenates all the data and then sends it to the screen (to fix flicker) -- Didn't make a difference
 
 3) Write a title screen
 	a) allow the user to choose to load from a file/generate a new board
@@ -24,8 +24,9 @@ To-Do List
 
 Bugs
 ----
-1) As the screen is written, the ships are shown breifly, for some reason -- can not reproduce
-2) If shots == 0, the game does not end	-- fixed
+1) [Can not reproduce] As the screen is written, the ships are shown breifly, for some reason -- can not reproduce
+2) [Fixed] If shots == 0, the game does not end	-- fixed
+3) [Not an issue - was just the feedback like wasn't being cleared] When a level has been beaten, and the player attempts to load the same level again, they will win immediatley (I assume this is just carrying over the last state the board was in because it wasn't re-loaded properly).  The program then soft-locks
 
 Bonus Goals
 -----------
