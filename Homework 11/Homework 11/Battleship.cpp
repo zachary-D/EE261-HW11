@@ -375,14 +375,15 @@ namespace utilities
 		return (int) ASCII::ZERO <= inp && (int) inp <= (int) ASCII::NINE;
 	}
 
-	int rand(int lower, int higher)
+	int rand(int lower, int higher)		//Returns a random number between 'lower' and 'higher'
 	{
 		if(lower >= higher) throw rand_badBounds;
 		return std::rand() % (higher - lower + 1) + lower;
 	}
 
-	//Credit to https://stackoverflow.com/questions/1903954/is-there-a-standard-sign-function-signum-sgn-in-c-c
 	template <typename T> int sgn(T val) {
+		//Returns -1 when val < 0, 0 when val = 0, and 1 when val > 0
+		//Credit to https://stackoverflow.com/questions/1903954/is-there-a-standard-sign-function-signum-sgn-in-c-c
 		return (T(0) < val) - (val < T(0));
 	}
 };
