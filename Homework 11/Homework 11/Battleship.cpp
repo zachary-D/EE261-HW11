@@ -1,3 +1,4 @@
+#include <ctime>
 #include <iostream>
 #include <fstream>
 #include <string>
@@ -21,6 +22,8 @@ bool debugCommandsOn = false;			//Controls if debug commands are turned on
 //Some debug flags
 bool debug_forceRun = false;
 bool debug_showShips = false;
+
+int generatorLoopNum = 0;
 
 enum gameState_type		//The current state the game is in
 {
@@ -47,6 +50,23 @@ struct coordi	//A coordinate pair of integers
 	coordi operator+(coordi & other)
 	{
 		return coordi(x + other.x, y + other.y);
+	}
+
+	coordi operator+=(coordi & other)
+	{
+		x += other.x;
+		y += other.y;
+		return *this;
+	}
+
+	bool operator==(coordi & other)
+	{
+		return (x == other.x) && (y == other.y);
+	}
+
+	bool operator!=(coordi & other)
+	{
+		return (x != other.x) || (y != other.y);
 	}
 };
 
@@ -95,6 +115,10 @@ enum errorstates {			//Various errors that can be thrown
 
 	board_badX,			//Game board - The x value is invalid
 	board_badY,			//Game board - The y value is invalid
+
+	board_gen_shipExists,	//Game board - board generator - generator attempted to place a ship over another (isn't really an error, but is used to loop if this happens)
+
+	rand_badBounds,		//utilities::rand(), min is greater than or equal to max (no valid values)
 };
 
 enum class ASCII		//ASCII characters and their associated integer numbers
@@ -350,7 +374,20 @@ namespace utilities
 	{
 		return (int) ASCII::ZERO <= inp && (int) inp <= (int) ASCII::NINE;
 	}
+
+	int rand(int lower, int higher)
+	{
+		if(lower >= higher) throw rand_badBounds;
+		return std::rand() % (higher - lower + 1) + lower;
+	}
+
+	//Credit to https://stackoverflow.com/questions/1903954/is-there-a-standard-sign-function-signum-sgn-in-c-c
+	template <typename T> int sgn(T val) {
+		return (T(0) < val) - (val < T(0));
+	}
 };
+
+namespace util = utilities;
 
 void clearConsole()
 {
@@ -537,9 +574,66 @@ public:
 		board[pos.x][pos.y] = cell;
 	}
 
-	bool createShip(coordi startingPoint, direction_type direction = north, int length = 1)
+	//Places a ship of 'length' at 'startingPoint' in 'direction'
+	void createShip(coordi startingPoint, direction_type direction = north, int length = 1)
 	{
+		coordi size(0, 0);		//The 'size' of the ship, with 'startingPoint' as the origin
 
+		switch(direction)
+		{
+			case north:
+				size.y = -length;
+				break;
+
+			case east:
+				size.x = length;
+				break;
+
+			case south:
+				size.y = length;
+				break;
+
+			case west:
+				size.x = -length;
+				break;
+		}
+
+		coordi pos = startingPoint;		//The current point
+
+		do		//loop util pos == startingPoint + size, checking for other ships
+		{
+			if(getContents(pos) == ship)
+			{
+				generatorLoopNum;
+				throw board_gen_shipExists;
+			}
+
+			pos += coordi(util::sgn(size.x), util::sgn(size.y));	//Incriment pos in the proper direction
+		} while(pos != startingPoint + size);
+
+		pos = startingPoint;
+
+		do		//loop util pos == startingPoint + size, placing ship elements
+		{
+			setContents(pos, ship);
+
+			pos += coordi(util::sgn(size.x), util::sgn(size.y));	//Incriment pos in the proper direction
+		}
+		while(pos != startingPoint + size);
+	}
+
+	void createShip(int length)		//Randomly places a ship of 'length'
+	{
+		direction_type dir = direction_type(util::rand(0, 3));
+
+		int xMin = (dir == west ? length : 0);
+		int xMax = (dir == east ? size.x - length : size.x);
+		int yMin = (dir == north ? length : 0);
+		int yMax = (dir == south ? size.y - length : size.y);
+
+		coordi pos = coordi(util::rand(xMin, xMax), util::rand(yMin, yMax));
+
+		createShip(pos, dir, length);
 	}
 
 	int getShots() { return shots; }
@@ -705,7 +799,19 @@ public:
 		screen.write(coordi(54 + 2, 2 + 15), utilities::toString(getShots()));
 	}
 
+	void generateGameBoard()
+	{
+		cout << "Please be patient, this may take a second..." << endl;
+		emptyBoard();
+		
+		vector<int> lengths {2, 2, 3, 3, 4};
 
+		for(int iter = 0; iter < lengths.size(); iter++)		//Generate ships with lengths dictated in 'lengths'
+		{
+			try { createShip(lengths[iter]); }
+			catch(...) { iter--; } //If there's any error, just de-incriment the iterator and start over and run the randomizer again.  The issue is unlikely to crop up repeatedly
+		}
+	}
 
 };
 
@@ -730,6 +836,8 @@ void promptUserToResizeWindow()		//Prompts the user to resize their window so th
 
 void setup()		//General startup actions
 {
+	srand(std::time(NULL));	//Seed the randomizer
+
 	promptUserToResizeWindow();
 	gameState = title;
 
@@ -901,15 +1009,6 @@ bool handleDebugCommands(vector<string> command)		//Checks for and executes debu
 	return true;
 }
 
-void handlePlayerCommands()
-{
-
-
-	//if(gameState == running || debugCommandsOn == true)
-	
-}
-
-
 void lossScreen()
 {
 	gameBoard.print(true);
@@ -963,7 +1062,8 @@ void mainLoop()
 
 			string input;
 
-			while(true)	//Loop until we get valid data from the player
+			//Loop until we get valid data from the player
+			while(true)
 			{
 				getline(cin, input);
 
@@ -1003,6 +1103,7 @@ void mainLoop()
 						if(error == file_notFound) cout << "An error was encoutered: The file could not be found." << endl;
 						else cout << "An unspecified error was encountered." << endl;
 						cout << "Generating new game board..." << endl;
+						gameBoard.generateGameBoard();
 					}
 					gameState = running;
 				}
@@ -1010,8 +1111,8 @@ void mainLoop()
 			else if(input[0] == '2')
 			{
 				//Generate a new game board
-
-
+				gameBoard.generateGameBoard();
+				gameState = running;
 			}
 			else if(input[0] == '3')
 			{
@@ -1038,8 +1139,6 @@ void mainLoop()
 			vector<string> command = utilities::separateStringsBySpaces(utilities::toLower(input));
 
 			screen.clearRow(28);		//Clear the row used for feedback
-
-			handlePlayerCommands();
 
 			if(debug_forceRun && debugCommandsOn) gameState = running;
 
