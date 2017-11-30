@@ -375,7 +375,7 @@ namespace utilities
 		return (int) ASCII::ZERO <= inp && (int) inp <= (int) ASCII::NINE;
 	}
 
-	int rand(int lower, int higher)		//Returns a random number between 'lower' and 'higher'
+	int rand(int lower, int higher)		//Returns a random number between 'lower' and 'higher' (inclusive)
 	{
 		if(lower >= higher) throw rand_badBounds;
 		return std::rand() % (higher - lower + 1) + lower;
@@ -628,9 +628,9 @@ public:
 		direction_type dir = direction_type(util::rand(0, 3));
 
 		int xMin = (dir == west ? length : 0);
-		int xMax = (dir == east ? size.x - length : size.x);
+		int xMax = (dir == east ? size.x - length : size.x - 1);
 		int yMin = (dir == north ? length : 0);
-		int yMax = (dir == south ? size.y - length : size.y);
+		int yMax = (dir == south ? size.y - length : size.y - 1);
 
 		coordi pos = coordi(util::rand(xMin, xMax), util::rand(yMin, yMax));
 
@@ -914,15 +914,12 @@ void setup()		//General startup actions
 		screen.write(coordi(menuX, menuY + 14), "Shots remaining:");
 
 	}
-
-	screen.write(coordi(0, 29), "Please enter a command, Admiral.");
-
 }
 
 void printPlayerFeedback(string feedback)		//Prints 'feedback' for the player to the specific spot in the screen buffer reserved for it 
 {
+	screen.clearRow(28);
 	screen.write(coordi(0, 28), feedback, true);
-		//Also add a debug command mode so you can tweak game variables as it runs
 }
 
 bool handleDebugCommands(vector<string> command)		//Checks for and executes debug commands in 'command' if they exist.  Returns 'true' if it is a debug command, false if not
@@ -1077,6 +1074,8 @@ void mainLoop()
 
 			if(input[0] == '1')
 			{
+				screen.clearRow(29);
+				screen.write(coordi(0, 29), "Please enter a command, Admiral.");
 				string filename = "";
 				while(true)
 				{
@@ -1111,6 +1110,8 @@ void mainLoop()
 			}
 			else if(input[0] == '2')
 			{
+				screen.clearRow(29);
+				screen.write(coordi(0, 29), "Please enter a command, Admiral.");
 				//Generate a new game board
 				gameBoard.generateGameBoard();
 				gameState = running;
