@@ -644,6 +644,7 @@ public:
 		if(value > 0 || force) shots = value;		//If the number of shots remaning is greater than 0, or force (as in force setting) is enabled, set it to the value
 	}
 
+	//This is the equivalent to FleetSunk() as mentioned in the homework.  I've called it something else to wrap the shot-checking in and to make what it does clearer.
 	void checkWinLoss()			//Checks the game data for win/loss conditions
 	{
 		{	//If there are no ships left on the board, the player wins
@@ -902,9 +903,9 @@ void setup()		//General startup actions
 		screen.write(coordi(menuX, menuY + 2), "H = hit");
 		screen.write(coordi(menuX, menuY + 3), "M = miss");
 
-		screen.write(coordi(menuX, menuY + 5), "Commands:");
-		screen.write(coordi(menuX, menuY + 6), "help");
-		screen.write(coordi(menuX, menuY + 7), "   shows help");
+		screen.write(coordi(menuX, menuY + /*5*/7), "Commands:");
+		//screen.write(coordi(menuX, menuY + 6), "help");
+		//screen.write(coordi(menuX, menuY + 7), "   shows help");
 
 		screen.write(coordi(menuX, menuY + 9), "fire <letter><number>");
 		screen.write(coordi(menuX, menuY + 10), "   fires at the");
