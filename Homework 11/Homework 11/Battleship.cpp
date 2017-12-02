@@ -23,7 +23,7 @@ bool debugCommandsOn = false;			//Controls if debug commands are turned on
 bool debug_forceRun = false;
 bool debug_showShips = false;
 
-int generatorLoopNum = 0;
+int generatorLoopNum = 0;		//Used to track the number of times the gameBoard generator has looped, used in debugging
 
 enum gameState_type		//The current state the game is in
 {
@@ -69,9 +69,6 @@ struct coordi	//A coordinate pair of integers
 		return (x != other.x) || (y != other.y);
 	}
 };
-
-//Idea: Don't actually store a 2-d grid of ships, store a vector of ships and instead have their beginning and ending points tracked as part of them.  If a shot falls within
-		//their area, count that as a shot.
 
 enum cellContents_type {	//What a given cell on the game board contains (either ocean or ship type)
 	null,					//No data
@@ -243,25 +240,25 @@ namespace utilities
 
 	vector<string> separateStringsBySpaces(string str)		//Separates a string into a vector of strings, using spaces as separators (i.e. "A B C" -> {a,b,c})
 	{
-		vector<string> ret;
+		vector<string> ret;	//The extracted data
 
-		string data = "";
+		string data = "";	//The current segment of data
 
-		for(auto iter = str.begin(); iter != str.end(); iter++)
+		for(auto iter = str.begin(); iter != str.end(); iter++)	//Loop over every element in the string
 		{
-			if(*iter == ' ')
+			if(*iter == ' ')	//If the character reached is a space, move the current segment to the extracted data array, and reset the extracted data string
 			{
 				ret.push_back(data);
 				data = "";
 			}
 			else data.push_back(*iter);
 		}
-		if(data != "") ret.push_back(data);
-
+		if(data != "") ret.push_back(data);	//If the data we have itsn't none, add it to the extracted data vector
+		
 		return ret;
 	}
 
-	string errorStateToString(errorstates err)
+	string errorStateToString(errorstates err)		//Returns the string equivalent of some exceptions, to print them to the screen
 	{
 		switch(err)
 		{
@@ -302,7 +299,7 @@ namespace utilities
 		return "Unknown error.";
 	}
 
-	string toString(int value)
+	string toString(int value)		//Converts an integer to a string
 	{
 		string ret;
 
@@ -315,7 +312,7 @@ namespace utilities
 		return ret;
 	}
 
-	double toNum(char inp, bool noFail = false)
+	double toNum(char inp, bool noFail = false)		//Converts a char to a number.  Doesn't throw any exceptions if noFail == true 
 	{
 		double ret;
 
@@ -328,7 +325,7 @@ namespace utilities
 		return ret;
 	}
 
-	double toNum(string inp)
+	double toNum(string inp)	//Converts a string to a number
 	{
 		double ret;
 
@@ -341,7 +338,7 @@ namespace utilities
 		return ret;
 	}
 
-	bool isNum(string inp)
+	bool isNum(string inp)		//Returns whether or not inp is a number
 	{
 		try
 		{
@@ -355,7 +352,7 @@ namespace utilities
 		return true;
 	}
 
-	string toLower(string input)
+	string toLower(string input)	//Converts input to lowercase
 	{
 		for(int i = 0; i < input.size(); i++)
 		{
@@ -370,7 +367,7 @@ namespace utilities
 		return 'a' <= inp && inp <= 'z';
 	}
 
-	bool isCharNum(char inp)	//Is the character the CHARACTER for 0->9, NOT if the char ID is 0->9
+	bool isCharNum(char inp)	//Is the character 'inp' the CHARACTER for 0->9, NOT if the char ID is 0->9
 	{
 		return (int) ASCII::ZERO <= inp && (int) inp <= (int) ASCII::NINE;
 	}
@@ -381,6 +378,7 @@ namespace utilities
 		return std::rand() % (higher - lower + 1) + lower;
 	}
 
+	//Returns the sign of 'val'
 	template <typename T> int sgn(T val) {
 		//Returns -1 when val < 0, 0 when val = 0, and 1 when val > 0
 		//Credit to https://stackoverflow.com/questions/1903954/is-there-a-standard-sign-function-signum-sgn-in-c-c
@@ -388,20 +386,20 @@ namespace utilities
 	}
 };
 
-namespace util = utilities;
+namespace util = utilities;		//Creates a shortcut for utilities
 
-void clearConsole()
+void clearConsole()		//Clears the console
 {
 	system("cls");
 }
 
-class screenBuffer_type		//The buffer characters are written to before they are written to the screen.  Used to only change portions of the screen at once
+class screenBuffer_type		//The buffer characters are written to before they are written to the screen.  Used to only change portions of the screen, keeping other parts the same
 {
 	coordi size;
 	vector<vector<char>> buffer;
 
 public:
-	void setSize(coordi _size)
+	void setSize(coordi _size)	//Sets the size of the buffer, and expands/shrinks the buffer to that size
 	{
 		if(_size.x < 1) throw buffer_xToSmall;
 		if(_size.y < 1) throw buffer_yToSmall;
@@ -435,7 +433,7 @@ public:
 		}
 	}
 
-	void pushToConsole()
+	void pushToConsole()	//Exports the data from the buffer to the console
 	{
 		clearConsole();
 		for(int y = 0; y < size.y; y++)
@@ -484,10 +482,10 @@ public:
 
 screenBuffer_type screen;
 
-class gameBoard_type		//A game board.  Set up as a class so 2-person play is possible, and also to add data validation functions (i.e. don't let things read/write to [-1, 6], etc)
+class gameBoard_type		//A game board.  Set up as a class so 2-person play is possible (not currently implimented), and also to add data validation functions (i.e. don't let things read/write to [-1, 6], etc)
 {							//The board also contains some other gameplay data, i.e. number of shots remaining
 public:
-	gameBoard_type::gameBoard_type(coordi boardSize) {
+	gameBoard_type::gameBoard_type(coordi boardSize) {	//Creates a new gameBoard element with 'size' dimensions
 		size = boardSize;
 
 		//Trim or expand the x-axis to size
@@ -530,7 +528,7 @@ private:
 	vector<errorstates> fileErrors;
 
 public:
-	void emptyBoard()		//Empties the game board.  WILL RESULT IN DATA LOSS
+	void emptyBoard()		//Empties the game board.  WILL RESULT IN DATA LOSS (duh)
 	{
 		//Empty the data from the board
 		while(board.size() > 0) board.pop_back();
@@ -675,7 +673,7 @@ public:
 
 	}
 
-	shotResult fire(coordi at)	//Returns true if the shot hit something, otherwise false
+	shotResult fire(coordi at)	//Attempts to fire at 'at', and returns the restult as a shotResult type
 	{
 		if(shots <= 0)		//If we have no shots remaining, we cannot fire.
 		{
@@ -710,7 +708,7 @@ public:
 		}
 	}
 
-	shotResult fire(char _let, int _num)		//Returns true if the shot hit something, otherwise returns false
+	shotResult fire(char _let, int _num)		//Attempts to convert the letter and number to coordinates, and returns the restult as a shotResult type
 	{
 		return fire(coordi(toupper(_let) - 'A', _num));		//the letter coordinate is determined by toupper(_let) - 'A' because that means when _let == 'A', the result will be 0
 	}
@@ -769,7 +767,7 @@ public:
 		file.close();
 	}
 
-	void printErrors()
+	void printErrors()		//Prints any errors encoutered when loading the file
 	{
 		if(fileErrors.size() > 0)
 		{
@@ -785,7 +783,7 @@ public:
 		}
 	}
 
-	void print(bool showHiddenShips = false)
+	void print(bool showHiddenShips = false)	//Prints the game board to the screen buffer, as well as the shots remaining
 	{
 		coordi displacement = coordi(3, 2);		//The coordinates of the upper left portion of the board on the buffer
 
@@ -797,11 +795,12 @@ public:
 			}
 		}
 
+		//Prints the shots remaining
 		screen.write(coordi(54 + 2, 2 + 15), "     ", true);
 		screen.write(coordi(54 + 2, 2 + 15), utilities::toString(getShots()));
 	}
 
-	void generateGameBoard()
+	void generateGameBoard()		//Randomly generates a game board to play on
 	{
 		cout << "Please be patient, this may take a second..." << endl;
 		emptyBoard();
@@ -811,7 +810,7 @@ public:
 		for(int iter = 0; iter < lengths.size(); iter++)		//Generate ships with lengths dictated in 'lengths'
 		{
 			try { createShip(lengths[iter]); }
-			catch(...) { iter--; } //If there's any error, just de-incriment the iterator and start over and run the randomizer again.  The issue is unlikely to crop up repeatedly
+			catch(...) { iter--; } //If createShip throws a shipexists exception, deincriment the iterator run it again to get new coordinates.  If it's anything else, just de-incriment the iterator and start over and run the randomizer again.  The issue is unlikely to crop up repeatedly.
 		}
 	}
 
@@ -1008,7 +1007,7 @@ bool handleDebugCommands(vector<string> command)		//Checks for and executes debu
 	return true;
 }
 
-void lossScreen()
+void lossScreen()		//Prints the loss screen when the player loses
 {
 	gameBoard.print(true);
 
@@ -1027,7 +1026,7 @@ void lossScreen()
 
 }
 
-void winScreen()
+void winScreen()	//Prints the victory screen when the player wins
 {
 	gameBoard.print(true);
 
@@ -1045,9 +1044,9 @@ void winScreen()
 }
 
 
-void mainLoop()
+void mainLoop()		//The main loop of the program, containing all of the game's main logic
 {
-	while(gameState != quitting)
+	while(gameState != quitting)	//Loop unless we're quitting
 	{
 		if(gameState == title)
 		{
