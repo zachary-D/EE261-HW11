@@ -727,7 +727,7 @@ public:
 			string line;
 			getline(file, line);
 
-			if(!file.eof())
+			if(!file.eof() || y == (size.y - 1))	//If the file ends before we're finished reading data (we expect file.eof() to be true for the last line, hence the y != size.y - 1)
 			{	//If the line from the file was loaded successfully
 				vector<cellContents_type> row = utilities::extractCellsFromString(line);
 
@@ -743,11 +743,17 @@ public:
 				//Store the data loaded
 				for(int x = 0; x < size.x; x++)
 				{
-					board[x][y] = row[x];
+					if(x < row.size()) board[x][y] = row[x];
+					else
+					{
+						fileErrors.push_back(file_lineTooShort);
+						board[x][y] = ocean;
+					}
 				}
 			}
 			else
 			{
+				//If the line wasn't loaded properly, set a error flag and fill the empty space with ocean tiles
 				fileErrors.push_back(file_eof);
 				for(int x = 0; x < size.x; x++)
 				{
